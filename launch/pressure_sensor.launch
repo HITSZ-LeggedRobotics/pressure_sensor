@@ -1,0 +1,7 @@
+<launch>
+
+<param name="/pressure_sensor/initial_pressure_value"  value="0.001"/>
+<param name="/pressure_sensor/usb_port" value="/dev/ttyUSB1"/>
+<node pkg="pressure_sensor" type="pressure_sensor_demo_node" name="pressure_sensor_demo_node" />
+
+</launch>

@@ -56,7 +56,8 @@ private:
   unsigned int buad_rate_;
   io_service io_sev_;
   serial_port *sp;
-  int initial_pressure_value=0.03;
+  float initial_pressure_value;
+  std::vector<float> initial_bias;
   std::string set_zero = "AT+ADJZF=1;1;1;1;1;1\r\n";
   std::string set_update_rate = "AT+SMPR=100\r\n";
   std::string set_decouple_matrix = "AT+DCPM=(2497.565,0.000000,0.000000,0.000000,0.000000,0.000000);(0.000000,2530.428,0.000000,0.000000,0.000000,0.000000);(0.000000,0.000000,5176.251,0.000000,0.000000,0.000000);(0.000000,0.000000,0.000000,2494.512,0.000000,0.000000);(0.000000,0.000000,0.000000,0.000000,2493.392,0.000000);(0.000000,0.000000,0.000000,0.000000,0.000000,5101.520)\r\n";

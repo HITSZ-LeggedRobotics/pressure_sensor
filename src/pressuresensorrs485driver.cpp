@@ -6,15 +6,28 @@ PressureSensorRS485Driver::PressureSensorRS485Driver(const ros::NodeHandle& node
   : node_handle_(node_handle),
     serial_name_(serial_name),
     buad_rate_(buad_rate),
-    update_rate(50)
+    update_rate(50),
+    initial_pressure_value(0.03)
 {
   ROS_INFO("Driver Construct");
 //  unsigned char frame[8] ={0x01,0x03,0x00,0x00,0x00,0x01,0x84,0x0A};
+  if(!node_handle_.getParam("/pressure_sensor/initial_pressure_value", initial_pressure_value))
+    {
+      ROS_ERROR("Can't find parameter of 'initial_pressure_value'");
+//      return false;
+    }
+  if(!node_handle_.getParam("/pressure_sensor/usb_port", serial_name_))
+    {
+      ROS_ERROR("Can't find parameter of 'serial_name_'");
+//      return false;
+    }
+  ROS_INFO("Open Serial Port '%s' ",serial_name_.c_str());
   sp = new serial_port(io_sev_);
   if(sp)
     {
       SerialInitialize();
     }
+
 //  force_pub_1 = node_handle_.advertise<geometry_msgs::WrenchStamped>("force_and_torque_ch1", 1);
 //  force_pub_2 = node_handle_.advertise<geometry_msgs::WrenchStamped>("force_and_torque_ch2", 1);
   //contact_pub_ = node_handle_.advertise<sim_assiants::FootContacts>("/foot_contacts",1);
@@ -124,14 +137,14 @@ void PressureSensorRS485Driver::SensorReadThread()
       write(*sp, buffer(read_sensor_data_03,8));
       size_t len_03 = read(*sp, buffer(data_frame_03,7));
       for(int i=0;i<len_03;i++){
-       data_frame_03_[i] = data_frame_03[i];
+       data_frame_04_[i] = data_frame_03[i];
               //printf("01:%02X ",data_frame_01_[i]);
       }
 
       write(*sp, buffer(read_sensor_data_04,8));
       size_t len_04 = read(*sp, buffer(data_frame_04,7));
       for(int i=0;i<len_04;i++){
-       data_frame_04_[i] = data_frame_04[i];
+       data_frame_03_[i] = data_frame_04[i];
               //printf("01:%02X ",data_frame_01_[i]);
       }
      // ROS_INFO("recieve %d bytes in buffer 02: \n", int(len_02));
@@ -157,8 +170,14 @@ bool PressureSensorRS485Driver::DataProscessAndPublishThread()
 {
   ROS_INFO("Get in Data Process and Publish Thread 01 ");
   ros::Rate rate(100);
-
+  initial_bias.resize(4);
   contact_pub_ = node_handle_.advertise<sim_assiants::FootContacts>("/foot_contacts",1);
+  ros::Duration delay(1);
+  delay.sleep();
+  initial_bias[0] = (float)((data_frame_01_[3]<<8)|data_frame_01_[4])/2000.0;
+  initial_bias[1] = (float)((data_frame_02_[3]<<8)|data_frame_02_[4])/2000.0;
+  initial_bias[2] = (float)((data_frame_03_[3]<<8)|data_frame_03_[4])/2000.0;
+  initial_bias[3] = (float)((data_frame_04_[3]<<8)|data_frame_04_[4])/2000.0;
   while (ros::ok()) {
       boost::recursive_mutex::scoped_lock lock(r_mutex_);
       //std::vector<unsigned char> data_frame_copy = data_frame_01_;
@@ -193,25 +212,25 @@ bool PressureSensorRS485Driver::DataProscessAndPublishThread()
       lock.unlock();
       contact_msg.foot_contacts.resize(4);
       contact_msg.foot_contacts[0].contact_force.wrench.force.z = pressure_value_01_;
-      if(pressure_value_01_>initial_pressure_value)
+      if(pressure_value_01_>(initial_pressure_value+initial_bias[0]))
          contact_msg.foot_contacts[0].is_contact = true;
       else
          contact_msg.foot_contacts[0].is_contact = false;
 
       contact_msg.foot_contacts[1].contact_force.wrench.force.z = pressure_value_02_;
-      if(pressure_value_02_>initial_pressure_value)
+      if(pressure_value_02_>(initial_pressure_value+initial_bias[1]))
          contact_msg.foot_contacts[1].is_contact = true;
       else
          contact_msg.foot_contacts[1].is_contact = false;
 
       contact_msg.foot_contacts[2].contact_force.wrench.force.z = pressure_value_03_;
-      if(pressure_value_03_>initial_pressure_value)
+      if(pressure_value_03_>(initial_pressure_value+initial_bias[2]))
          contact_msg.foot_contacts[2].is_contact = true;
       else
          contact_msg.foot_contacts[2].is_contact = false;
 
       contact_msg.foot_contacts[3].contact_force.wrench.force.z = pressure_value_04_;
-      if(pressure_value_04_>initial_pressure_value)
+      if(pressure_value_04_>(initial_pressure_value+initial_bias[3]))
          contact_msg.foot_contacts[3].is_contact = true;
       else
          contact_msg.foot_contacts[3].is_contact = false;
